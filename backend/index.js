@@ -5,6 +5,7 @@ import cors from 'cors';
 import userRouter from './route/user.route.js';
 import connectToDb from './db.js';
 import basicUserInfo from './middelware/basicUserInfo.js';
+import { userOnboarding } from './controller/user.controller.js';
 
 dotenv.config();
 const app = express();
@@ -22,6 +23,9 @@ const checkJwt = auth({
 });
   
 app.use(checkJwt);
+
+app.post('/api/user/onboarding', userOnboarding);
+
 app.use(basicUserInfo);
 
 app.use('/api/user', userRouter);
