@@ -1,64 +1,46 @@
-import { useUser } from "@/hooks/useUser";
-import React, { use, useState } from "react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
+import { handleApiError } from "@/utils/errorHandler";
+import { useAuth0 } from "@auth0/auth0-react";
+import axios from "axios";
+import React, { useEffect } from "react";
 
 const FriendsList = () => {
-  const { user } = useUser();
-  const [friends, setFriends] = useState(user.friends);
+  const { getAccessTokenSilently } = useAuth0();
+  const [friends, setFriends] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
 
+  useEffect(() => {
+    const fetchFriends = async () => {
+      setLoading(true);
+      try {
+        const token = await getAccessTokenSilently();
+        const response = await axios.get(
+          `${import.meta.env.VITE_SERVER_URL}/api/friend/list`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        console.log(response.data);
+        setFriends(response.data.friends);
+      } catch (error) {
+        handleApiError(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFriends();
+  }, []);
 
-
-  if (!friends) {
-    return <div>Loading...</div>;
+  if (loading) {
+    return <p>Loading ...</p>;
   }
+
   if (friends.length === 0) {
-    return (
-      <div>
-        You have no friends <AddFriend>add</AddFriend>
-      </div>
-    );
+    return <p>No Friends Found. Consider Adding Them 😏</p>;
   }
-  return <div>FriendsList
-    {friends.map((friend)=>(
-      <div key={friend.id} className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center">
-          <span>name</span>
-        </div>
-        <Button>Remove</Button>
-      </div>
-    ))}
-    <AddFriend/>
-  </div>;
+
+  return <div>FriendsList</div>;
 };
 
 export default FriendsList;
-
-function AddFriend(){
-  const [username, setUsername] = useState("");
-  const { user } = useUser();
-  const { getAccessTokenSilently } = useAuth0();
-  const handleAddFriend = async () => {
-    try {
-      const token = await getAccessTokenSilently();
-      const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/user/add-friend`,
-        { username },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      toast.success("Friend added successfully");
-    } catch (error) {
-      handleApiError(error);
-    }
-  };
-  return (
-    <div className="flex gap-4 max-w-sm mt-4">
-      <Input type="text" placeholder="Enter friend's username" />
-      <Button>Add Friend</Button>
-    </div>
-  );
-}

@@ -41,7 +41,7 @@ export const handleApiError = (error, options = {}) => {
   }
   
   if (logToConsole) {
-    console.error("Error details:", error);
+    console.error("Error details:", error.message);
   }
   
   return errorMessage;

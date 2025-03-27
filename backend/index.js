@@ -3,6 +3,7 @@ import { auth } from 'express-oauth2-jwt-bearer';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import userRouter from './route/user.route.js';
+import friendRouter from './route/friend.route.js';
 import connectToDb from './db.js';
 import basicUserInfo from './middelware/basicUserInfo.js';
 import { userOnboarding } from './controller/user.controller.js';
@@ -26,8 +27,10 @@ app.use(checkJwt);
 
 app.post('/api/user/onboarding', userOnboarding);
 
+
 app.use(basicUserInfo);
 
 app.use('/api/user', userRouter);
+app.use('/api/friend', friendRouter);
 
 app.listen(process.env.PORT || 3001, () => console.log(`Server running on port ${process.env.PORT || 3001}`));

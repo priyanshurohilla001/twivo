@@ -2,26 +2,29 @@ import mongoose from 'mongoose';
 const { Schema } = mongoose;
 
 const userSchema = new Schema({
-    sub : {
-        type : String,
-        required : true,
-        unique : true
-    } ,
-    username : {
-        type : String,
-        required : true
+    sub: {
+        type: String,
+        required: true,
+        unique: true
     },
-    email : {
-        type : String,
-        required : true
+    username: {
+        type: String,
+        required: true
     },
-    name : {
-        type : String,
-        required : true
+    email: {
+        type: String,
+        required: true
     },
-    friends : {
-        type : [String],
-        default : []
+    name: {
+        type: String,
+        required: true
+    },
+    friends: {
+        type: [{
+            friend: { type: Schema.Types.ObjectId, ref: 'User' },
+            accepted: { type: Boolean, default: false }
+        }],
+        default: []
     },
 });
 
