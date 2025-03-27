@@ -22,7 +22,8 @@ const userSchema = new Schema({
     friends: {
         type: [{
             friend: { type: Schema.Types.ObjectId, ref: 'User' },
-            accepted: { type: Boolean, default: false }
+            accepted: { type: Boolean, default: false },
+            username : { type: String, required: true }
         }],
         default: []
     },

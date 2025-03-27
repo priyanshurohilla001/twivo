@@ -99,6 +99,7 @@ export function UserProvider({ children }) {
         user,
         isLoading,
         isOnboarded,
+        setUser,
         completeOnboarding,
       }}
     >

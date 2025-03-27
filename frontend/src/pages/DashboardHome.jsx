@@ -1,4 +1,5 @@
 import AddFriend from "@/components/AddFriend";
+import FriendRequests from "@/components/FriendRequests";
 import FriendsList from "@/components/FriendsList";
 import { useUser } from "@/hooks/useUser";
 import { handleApiError } from "@/utils/errorHandler";
@@ -10,8 +11,6 @@ import { toast } from "sonner";
 const DashboardHome = () => {
   const { user } = useUser();
 
-  console.log("user",user)
-
   return (
     <div>
       <div className="mb-10">
@@ -20,6 +19,7 @@ const DashboardHome = () => {
       </div>
       <div className="flex gap-4">
       <AddFriend/>
+      <FriendRequests/>
       </div>
       <FriendsList/>
     </div>

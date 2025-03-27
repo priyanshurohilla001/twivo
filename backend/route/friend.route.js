@@ -2,7 +2,7 @@ import express from "express";
 import {
   addFriendReq,
   acceptFriendReq,
-  removeFriendReq,
+  removeFriend,
   getFriendsList,
 } from "../controller/friend.controller.js";
 
@@ -18,6 +18,6 @@ router.get("/", (req, res) => {
 router.get("/list", getFriendsList);
 router.post("/add", addFriendReq);
 router.post("/accept", acceptFriendReq);
-router.delete("/remove/:username", removeFriendReq);
+router.post("/reject", removeFriend);
 
 export default router;
