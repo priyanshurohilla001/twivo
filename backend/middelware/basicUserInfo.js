@@ -11,6 +11,7 @@ export default async function basicUserInfo(req, res, next) {
         userOnboarding: false,
       })
     }
+    console.log(response);
     req.user = response
   } catch (error) {
     console.log("error occured in basicUserInfo middleware" , error);

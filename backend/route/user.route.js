@@ -1,5 +1,5 @@
 import express from 'express';
-import { addFriend, getUserDashboard } from "../controller/user.controller.js";
+import {  getUserDashboard } from "../controller/user.controller.js";
 
 const router = express.Router();
 
@@ -10,12 +10,9 @@ router.get("/", (req, res) => {
   })
 });
 
-
 router.get("/basicinfo",(req, res) => {
   return res.json(req.user);
 })
-
-router.post("/add-friend",addFriend)
 
 
 router.get("/dashboard", getUserDashboard);

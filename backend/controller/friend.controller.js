@@ -1,8 +1,8 @@
 import User from "../model/user.model.js";
 import { usernameSchema } from "../zodTypes.js";
-import mongoose from "mongoose"; // Add this import
+import mongoose from "mongoose";
 
-export async function addFriendReq(req, res) {
+export async function sendFriendReq(req, res) {
   const parsedResult = usernameSchema.safeParse(req.body);
   if (!parsedResult.success) {
     return res.status(400).json({
@@ -11,8 +11,8 @@ export async function addFriendReq(req, res) {
       error: parsedResult.error.errors,
     });
   }
-  const { username } = parsedResult.data;
 
+  const { username } = parsedResult.data;
   const currentUserSub = req.auth.payload.sub;
 
   try {
@@ -23,41 +23,34 @@ export async function addFriendReq(req, res) {
         message: "User not found",
       });
     }
-    const currentUser = await User.findOne({ sub: currentUserSub });
-    if (!currentUser) {
-      return res.status(404).json({
+    const currentUser = req.user;
+
+    if (currentUser.username === username) {
+      return res.status(400).json({
         success: false,
-        message: "User not found",
+        message: "You cannot add yourself as a friend",
       });
     }
 
-    if(currentUser.username === username){
-        return res.status(400).json({
-            success: false,
-            message: "You cannot add yourself as a friend",
-        });
-    }
-
-    const friendExists = currentUser.friends.some(
-      (f) => f.friend.toString() === friend._id.toString()
+    // Check if the friend request already exists
+    const friendIndex = friend.friends.findIndex(
+      (f) => f.friend.toString() === currentUser._id.toString()
     );
 
-    if (friendExists) {
+    if (friendIndex !== -1) {
       return res.status(400).json({
         success: false,
         message: "Friend request already sent",
       });
     }
 
-    if (!friendExists) {
-      friend.friends.push({
-        friend: currentUser._id,
-        username: currentUser.username,
-        accepted: false,
-      });
+    friend.friends.push({
+      friend: currentUser._id,
+      username: currentUser.username,
+      accepted: false,
+    });
 
-      await friend.save();
-    }
+    await friend.save();
 
     return res.status(200).json({
       success: true,
@@ -72,6 +65,7 @@ export async function addFriendReq(req, res) {
     });
   }
 }
+
 export async function acceptFriendReq(req, res) {
   const parsedResult = usernameSchema.safeParse(req.body);
   if (!parsedResult.success) {
@@ -86,10 +80,10 @@ export async function acceptFriendReq(req, res) {
 
   // Start a session
   const session = await mongoose.startSession();
-  
+
   try {
     let result;
-    
+
     // Start a transaction
     await session.withTransaction(async () => {
       const friend = await User.findOne({ username }).session(session);
@@ -97,10 +91,7 @@ export async function acceptFriendReq(req, res) {
         throw new Error("Friend not found");
       }
 
-      const currentUser = await User.findOne({ sub: currentUserSub }).session(session);
-      if (!currentUser) {
-        throw new Error("User not found");
-      }
+      const currentUser = req.user;
 
       const friendRequestIndex = currentUser.friends.findIndex(
         (f) => f.friend.toString() === friend._id.toString()
@@ -141,7 +132,7 @@ export async function acceptFriendReq(req, res) {
   }
 }
 
-export async function removeFriend(req, res) {
+export async function removeFriendReq(req, res) {
   const parsedResult = usernameSchema.safeParse(req.body);
   if (!parsedResult.success) {
     return res.status(400).json({
@@ -154,23 +145,10 @@ export async function removeFriend(req, res) {
   const currentUserSub = req.auth.payload.sub;
 
   try {
-    const friend = await User.findOne({ username });
-    if (!friend) {
-      return res.status(404).json({
-        success: false,
-        message: "Friend not found",
-      });
-    }
-    const currentUser = await User.findOne({ sub: currentUserSub });
-    if (!currentUser) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
+    const currentUser = req.user;
 
     const friendIndex = currentUser.friends.findIndex(
-      (f) => f.friend.toString() === friend._id.toString()
+      (f) => f.username.toString() === username.toString()
     );
 
     if (friendIndex === -1) {
@@ -186,6 +164,7 @@ export async function removeFriend(req, res) {
     return res.status(200).json({
       success: true,
       message: "Friend removed successfully",
+      user: currentUser,
     });
   } catch (error) {
     console.error("Error removing friend:", error);
@@ -196,6 +175,90 @@ export async function removeFriend(req, res) {
     });
   }
 }
+
+export async function removeFriend(req, res) {
+  const parsedResult = usernameSchema.safeParse(req.body);
+  if (!parsedResult.success) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid input",
+      error: parsedResult.error.errors,
+    });
+  }
+  const { username } = parsedResult.data;
+  const currentUserSub = req.auth.payload.sub;
+
+  try {
+    const currentUser = req.user;
+
+    const friendIndex = currentUser.friends.findIndex(
+      (f) => f.username.toString() === username.toString()
+    );
+
+    if (friendIndex === -1) {
+      return res.status(400).json({
+        success: false,
+        message: "Friend not found in your list",
+      });
+    }
+
+    const session = await mongoose.startSession();
+
+
+    try {
+      let result;
+      await session.withTransaction(async () => {
+        // remove friend from current user
+        currentUser.friends.splice(friendIndex, 1);
+        await currentUser.save({ session });
+
+        // remove current user from friend's list
+        const friend = await User.findOneAndUpdate(
+          {username},
+          {
+            $pull: {
+              friends: {
+                friend: currentUser._id,
+                username: currentUser.username,
+              },
+            },
+          },
+          { session }
+        );
+
+        if (!friend) {
+          throw new Error("Friend not found");
+        }
+
+        result = {
+          success: true,
+          message : "Friend removed successfully",
+          user: currentUser,
+        }
+
+      });
+
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error("Error removing friend:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    } finally {
+      session.endSession();
+    }
+  } catch (error) {
+    console.error("Error removing friend:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+}
+
 export async function getFriendsList(req, res) {
   const currentUserSub = req.auth.payload.sub;
 
@@ -209,8 +272,6 @@ export async function getFriendsList(req, res) {
         message: "User not found",
       });
     }
-
-    console.log("populated friends", currentUser.friends);
 
     const friendsList = currentUser.friends.map((friend) => ({
       id: friend.friend._id,

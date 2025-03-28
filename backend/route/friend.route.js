@@ -1,9 +1,10 @@
 import express from "express";
 import {
-  addFriendReq,
+  sendFriendReq,
   acceptFriendReq,
   removeFriend,
   getFriendsList,
+  removeFriendReq,
 } from "../controller/friend.controller.js";
 
 const router = express.Router();
@@ -16,8 +17,9 @@ router.get("/", (req, res) => {
 });
 
 router.get("/list", getFriendsList);
-router.post("/add", addFriendReq);
+router.post("/add", sendFriendReq);
 router.post("/accept", acceptFriendReq);
-router.post("/reject", removeFriend);
+router.post("/reject", removeFriendReq);
+router.post("/remove", removeFriend);
 
 export default router;

@@ -17,7 +17,7 @@ const DashboardHome = () => {
         <h1 className="text-2xl font-semibold">Welcome to your Dashboard</h1>
         <p className="mt-2">Hello {user?.name}</p>
       </div>
-      <div className="flex gap-4">
+      <div className="flex gap-4 justify-end mb-3">
       <AddFriend/>
       <FriendRequests/>
       </div>
