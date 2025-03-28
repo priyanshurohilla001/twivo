@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import axios from "axios";
 import { toast } from "sonner";
@@ -11,6 +11,8 @@ export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isOnboarded, setIsOnboarded] = useState(null);
+
+  console.log("user in custom hook",user)
   
   // Load user data from localStorage on initial render
   useEffect(() => {
@@ -93,16 +95,17 @@ export function UserProvider({ children }) {
     }
   };
   
+  // Memoize the context value to prevent unnecessary re-renders
+  const contextValue = useMemo(() => ({
+    user,
+    isLoading,
+    isOnboarded,
+    setUser,
+    completeOnboarding,
+  }), [user, isLoading, isOnboarded]);
+  
   return (
-    <UserContext.Provider
-      value={{
-        user,
-        isLoading,
-        isOnboarded,
-        setUser,
-        completeOnboarding,
-      }}
-    >
+    <UserContext.Provider value={contextValue}>
       {children}
     </UserContext.Provider>
   );

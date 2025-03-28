@@ -11,9 +11,9 @@ router.get("/", (req, res) => {
 });
 
 router.get("/basicinfo",(req, res) => {
+  
   return res.json(req.user);
 })
-
 
 router.get("/dashboard", getUserDashboard);
 
