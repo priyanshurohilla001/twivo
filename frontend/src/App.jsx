@@ -8,6 +8,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect } from "react";
 import UserOnboarding from "./userOnboarding/UserOnboarding";
 import { UserProvider, useUser } from "./hooks/useUser";
+import { SocketProvider } from "./hooks/useSocket";
 
 export default function App() {
   return (
@@ -117,7 +118,11 @@ const DashboardRoute = ({ children }) => {
     } else if (!isLoading && isAuthenticated) {
       // Check if user exists and is not onboarded
       // For new users, isOnboarded might be null/undefined rather than strictly false
-      if (isOnboarded === false || isOnboarded === undefined || isOnboarded === null) {
+      if (
+        isOnboarded === false ||
+        isOnboarded === undefined ||
+        isOnboarded === null
+      ) {
         navigate("/onboarding");
       }
     }
@@ -138,10 +143,18 @@ const DashboardRoute = ({ children }) => {
   }
 
   // If not onboarded, don't show anything (will redirect in useEffect)
-  if (isOnboarded === false || isOnboarded === undefined || isOnboarded === null) {
+  if (
+    isOnboarded === false ||
+    isOnboarded === undefined ||
+    isOnboarded === null
+  ) {
     return null;
   }
 
   // User is authenticated and onboarded, show the dashboard
-  return <AuthRequiredRoute>{children}</AuthRequiredRoute>;
+  return (
+    <AuthRequiredRoute>
+      <SocketProvider>{children}</SocketProvider>
+    </AuthRequiredRoute>
+  );
 };
