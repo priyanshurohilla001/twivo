@@ -114,7 +114,7 @@ const DashboardRoute = ({ children }) => {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      navigate("/");
+      navigate("/login");
     } else if (!isLoading && isAuthenticated) {
       // Check if user exists and is not onboarded
       // For new users, isOnboarded might be null/undefined rather than strictly false
@@ -126,7 +126,7 @@ const DashboardRoute = ({ children }) => {
         navigate("/onboarding");
       }
     }
-  }, [authLoading, isAuthenticated, isLoading, isOnboarded, navigate]);
+  }, [authLoading, isAuthenticated, isLoading, isOnboarded]);
 
   // Show loading state when things are loading
   if (authLoading || isLoading) {

@@ -7,7 +7,7 @@ const SocketContext = createContext(undefined);
 
 export function SocketProvider({ children }) {
   const { isAuthenticated } = useAuth0();
-  const { user } = useUser();
+  const { user , setUser } = useUser();
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
 
@@ -33,10 +33,11 @@ export function SocketProvider({ children }) {
       setSocket(null);
       setIsConnected(false);
     };
-  }, [user, isAuthenticated]);
+  }, [ isAuthenticated]);
 
   // Handle socket events
   useEffect(() => {
+    
     if (!socket) return;
 
     const handleConnect = () => {
@@ -54,14 +55,26 @@ export function SocketProvider({ children }) {
       setIsConnected(false);
     };
 
+    const handleOnlineStatusChange = (username , statusTo) => {
+      console.log('Online status change:', username, statusTo);
+      const friendIndex = user.friends.findIndex(friend => friend.username === username);
+      if (friendIndex === -1) return;
+      setUser(prevUser => {
+        prevUser.friends[friendIndex].onlineStatus = statusTo;
+        return { ...prevUser };
+      })
+    }
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('connect_error', handleError);
+    socket.on('onlineStatusChange', handleOnlineStatusChange);
 
     return () => {
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.off('connect_error', handleError);
+      socket.off('onlineStatusChange', handleOnlineStatusChange);
     };
   }, [socket]);
 

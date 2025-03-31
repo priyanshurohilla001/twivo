@@ -1,4 +1,5 @@
 import User from "../model/user.model.js";
+import { connectedUsers } from "../index.js";
 
 export default async function basicUserInfo(req, res, next) {
   const sub = req.auth.payload.sub;
@@ -21,10 +22,11 @@ export default async function basicUserInfo(req, res, next) {
       const plainFriend = friend.toObject
         ? friend.toObject()
         : JSON.parse(JSON.stringify(friend));
-      plainFriend.onlineStatus = false;
+
+      const socketId = connectedUsers.get(plainFriend.username);
+      socketId ? plainFriend.onlineStatus = true : plainFriend.onlineStatus = false;
       return plainFriend;
     });
-
     req.user = userObj;
   } catch (error) {
     console.log("error occured in basicUserInfo middleware", error);

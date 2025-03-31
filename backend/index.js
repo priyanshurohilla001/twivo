@@ -9,6 +9,7 @@ import basicUserInfo from "./middelware/basicUserInfo.js";
 import { userOnboarding } from "./controller/user.controller.js";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import User from "./model/user.model.js";
 
 dotenv.config();
 const app = express();
@@ -36,7 +37,7 @@ const io = new Server(httpServer, {
 });
 
 // Connection handling
-const connectedUsers = new Map();
+export const connectedUsers = new Map();
 
 io.on("connection", (socket) => {
   console.log(`Connection attempt from ${socket.id}`);
@@ -47,14 +48,45 @@ io.on("connection", (socket) => {
     return socket.disconnect(true);
   }
 
-  // Store connection
-  connectedUsers.set(socket.id, username);
   console.log(`User ${username} connected (${socket.id})`);
+  
+  connectedUsers.set(username, socket.id);
 
-  // Handle disconnection
+  async function notifyOnlineStatusChange() {
+    const user = await User.findOne({ username }).lean();
+    if (!user) {
+      socket.disconnect()
+      return ;
+    }
+
+    user.friends.forEach((friend) => {
+      if(!friend.accepted) return;
+      const socketId = connectedUsers.get(friend.username);
+      if (socketId) {
+        io.to(socketId).emit("onlineStatusChange", username , true);
+      }
+    })
+  }
+
+  notifyOnlineStatusChange();
+
   socket.on("disconnect", (reason) => {
     console.log(`User ${username} disconnected (${reason})`);
-    connectedUsers.delete(socket.id);
+    connectedUsers.delete(username);
+
+    async function goingOffline() {
+      const user = await User.findOne({ username }).lean();
+      
+      user.friends.forEach((friend) => {
+        if(!friend.accepted) return;
+        const socketId = connectedUsers.get(friend.username);
+        if (socketId) {
+          io.to(socketId).emit("onlineStatusChange", username , false);
+        }
+      })
+    }
+  
+    goingOffline();
   });
 
   // Error handling
