@@ -12,8 +12,6 @@ export function UserProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isOnboarded, setIsOnboarded] = useState(null);
 
-  console.log("user in custom hook",user)
-  
   // Load user data from localStorage on initial render
   useEffect(() => {
     const storedUser = localStorage.getItem("user");

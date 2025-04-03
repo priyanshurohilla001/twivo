@@ -23,7 +23,7 @@ export async function sendFriendReq(req, res) {
         message: "User not found",
       });
     }
-    const currentUser = req.user;
+    const currentUser = req.currentUser;
 
     if (currentUser.username === username) {
       return res.status(400).json({
@@ -91,7 +91,7 @@ export async function acceptFriendReq(req, res) {
         throw new Error("Friend not found");
       }
 
-      const currentUser = req.user;
+      const currentUser = req.currentUser;
 
       const friendRequestIndex = currentUser.friends.findIndex(
         (f) => f.friend.toString() === friend._id.toString()
@@ -145,7 +145,7 @@ export async function removeFriendReq(req, res) {
   const currentUserSub = req.auth.payload.sub;
 
   try {
-    const currentUser = req.user;
+    const currentUser = req.currentUser;
 
     const friendIndex = currentUser.friends.findIndex(
       (f) => f.username.toString() === username.toString()
@@ -189,7 +189,7 @@ export async function removeFriend(req, res) {
   const currentUserSub = req.auth.payload.sub;
 
   try {
-    const currentUser = req.user;
+    const currentUser = req.currentUser;
 
     const friendIndex = currentUser.friends.findIndex(
       (f) => f.username.toString() === username.toString()
@@ -204,17 +204,19 @@ export async function removeFriend(req, res) {
 
     const session = await mongoose.startSession();
 
-
     try {
       let result;
       await session.withTransaction(async () => {
         // remove friend from current user
-        currentUser.friends.splice(friendIndex, 1);
-        await currentUser.save({ session });
+        const updatedUser = await User.findByIdAndUpdate(
+          currentUser._id,
+          { $pull: { friends: { username: username } } },
+          { new: true, session }
+        );
 
         // remove current user from friend's list
         const friend = await User.findOneAndUpdate(
-          {username},
+          { username },
           {
             $pull: {
               friends: {
@@ -232,10 +234,9 @@ export async function removeFriend(req, res) {
 
         result = {
           success: true,
-          message : "Friend removed successfully",
-          user: currentUser,
-        }
-
+          message: "Friend removed successfully",
+          user: updatedUser,
+        };
       });
 
       return res.status(200).json(result);

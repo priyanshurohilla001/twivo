@@ -9,8 +9,20 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { handleApiError } from "@/utils/errorHandler";
 import { toast } from "sonner";
 import axios from "axios";
+import CallButton from "./CallButton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
-const SingleFriendInList = ({friend }) => {
+const SingleFriendInList = ({ friend }) => {
   const { user, setUser } = useUser();
   const { getAccessTokenSilently } = useAuth0();
 
@@ -42,7 +54,6 @@ const SingleFriendInList = ({friend }) => {
     <Card className="flex justify-center items-center">
       <CardHeader className="flex flex-row items-center justify-start gap-4">
         <Avatar className="relative">
-          {/* <AvatarImage src="https://github.com/shadcn.png" /> */}
           <AvatarFallback>{friend.username[0]}</AvatarFallback>
           <div className="absolute top-2 right-2">
             {friend.onlineStatus ? (
@@ -54,16 +65,38 @@ const SingleFriendInList = ({friend }) => {
         </Avatar>
         <h3>{friend.username}</h3>
       </CardHeader>
-      
-      <CardFooter className="flex flex-row items-center justify-center  ">
-        <Button
-          variant="destructive"
-          onClick={() => handleRemoveFriend(friend.username)}
-          disabled={isLoading}
-        >
-          <UserX className="mr-2" />
-          Remove
-        </Button>
+
+      <CardFooter className="flex flex-row gap-2 items-center justify-center">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive">
+              <UserX />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove Friend</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to remove{" "}
+                <strong>{friend.username}</strong> from your friends list? This
+                action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction asChild>
+                <Button
+                  onClick={() => handleRemoveFriend(friend.username)}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Removing..." : "Remove"}
+                </Button>
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {friend.onlineStatus && <CallButton username={friend.username} />}
       </CardFooter>
     </Card>
   );

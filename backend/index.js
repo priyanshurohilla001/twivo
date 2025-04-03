@@ -27,13 +27,13 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST"],
   },
   transports: ["websocket", "polling"],
   connectionStateRecovery: {
     maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
-    skipMiddlewares: true
-  }
+    skipMiddlewares: true,
+  },
 });
 
 // Connection handling
@@ -49,43 +49,76 @@ io.on("connection", (socket) => {
   }
 
   console.log(`User ${username} connected (${socket.id})`);
-  
+
   connectedUsers.set(username, socket.id);
 
   async function notifyOnlineStatusChange() {
     const user = await User.findOne({ username }).lean();
     if (!user) {
-      socket.disconnect()
-      return ;
+      socket.disconnect();
+      return;
     }
 
     user.friends.forEach((friend) => {
-      if(!friend.accepted) return;
-      const socketId = connectedUsers.get(friend.username);
-      if (socketId) {
-        io.to(socketId).emit("onlineStatusChange", username , true);
+      if (friend.accepted) {
+        const socketId = connectedUsers.get(friend.username);
+        if (socketId) {
+          io.to(socketId).emit("onlineStatusChange", username, true);
+        }
       }
-    })
+    });
   }
 
   notifyOnlineStatusChange();
 
+  socket.on("call", (data) => {
+    const { to, from, offer } = data;
+    console.log("Call data:", data);
+    const socketId = connectedUsers.get(to);
+    if (socketId) {
+      io.to(socketId).emit("call", { from, offer });
+    }
+  });
+
+  socket.on("callAccepted", (data) => {
+    const { to, from, answer } = data;
+    const socketId = connectedUsers.get(to);
+    if (socketId) {
+      io.to(socketId).emit("callAccepted", { from, answer });
+    }
+  });
+  socket.on("callRejected", (data) => {
+    const { to, from } = data;
+    const socketId = connectedUsers.get(to);
+    if (socketId) {
+      io.to(socketId).emit("callRejected", { from });
+    }
+  });
+
+  socket.on("iceCandidate", (data) => {
+    const { to, from, candidate } = data;
+    const socketId = connectedUsers.get(to);
+    if (socketId) {
+      io.to(socketId).emit("iceCandidate", { from, candidate });
+    }
+  });
+  
   socket.on("disconnect", (reason) => {
     console.log(`User ${username} disconnected (${reason})`);
     connectedUsers.delete(username);
 
     async function goingOffline() {
       const user = await User.findOne({ username }).lean();
-      
+
       user.friends.forEach((friend) => {
-        if(!friend.accepted) return;
+        if (!friend.accepted) return;
         const socketId = connectedUsers.get(friend.username);
         if (socketId) {
-          io.to(socketId).emit("onlineStatusChange", username , false);
+          io.to(socketId).emit("onlineStatusChange", username, false);
         }
-      })
+      });
     }
-  
+
     goingOffline();
   });
 
@@ -94,7 +127,6 @@ io.on("connection", (socket) => {
     console.error(`Socket error (${username}):`, error);
   });
 });
-
 
 const checkJwt = auth({
   audience: process.env.AUTH0_AUDIENCE,
@@ -110,7 +142,7 @@ app.use("/api/friend", checkJwt, basicUserInfo, friendRouter);
 app.get("/health", (req, res) => {
   res.status(200).json({
     status: "ok",
-    connectedUsers: connectedUsers.size
+    connectedUsers: connectedUsers.size,
   });
 });
 
@@ -122,5 +154,3 @@ httpServer.listen(PORT, () => {
   CORS origin: ${io.opts.cors.origin}
   `);
 });
-
-

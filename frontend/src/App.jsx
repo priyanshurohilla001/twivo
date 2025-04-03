@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import UserOnboarding from "./userOnboarding/UserOnboarding";
 import { UserProvider, useUser } from "./hooks/useUser";
 import { SocketProvider } from "./hooks/useSocket";
+import { CallProvider } from "./hooks/useCall";
 
 export default function App() {
   return (
@@ -108,53 +109,47 @@ const OnboardingRoute = ({ children }) => {
 };
 
 const DashboardRoute = ({ children }) => {
+  const { isLoading, isAuthenticated, loginWithRedirect } = useAuth0();
+  const { user, isLoading: userLoading } = useUser();
   const navigate = useNavigate();
-  const { isOnboarded, isLoading, user } = useUser();
-  const { isAuthenticated, isLoading: authLoading } = useAuth0();
 
+  // step 1 : logged in
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate("/login");
-    } else if (!isLoading && isAuthenticated) {
-      // Check if user exists and is not onboarded
-      // For new users, isOnboarded might be null/undefined rather than strictly false
-      if (
-        isOnboarded === false ||
-        isOnboarded === undefined ||
-        isOnboarded === null
-      ) {
-        navigate("/onboarding");
-      }
+    if (!isLoading && !isAuthenticated) {
+      loginWithRedirect();
+      return;
     }
-  }, [authLoading, isAuthenticated, isLoading, isOnboarded]);
+  }, [isAuthenticated]);
 
-  // Show loading state when things are loading
-  if (authLoading || isLoading) {
+  // step 2 : user in db (for onboarding)
+  useEffect(() => {
+    if (!userLoading && !user) navigate("/onboarding");
+  }, [user]);
+
+  if (isLoading || userLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-lg font-medium">Loading your dashboard...</p>
+      <div>
+        <h1>Dashboard is loading ...</h1>
       </div>
     );
   }
 
-  // If not authenticated, don't show anything (will redirect in useEffect)
-  if (!isAuthenticated) {
-    return null;
-  }
+  console.log(
+    "user in test :",
+    user,
+    " auth loading :",
+    isLoading,
+    " user loading :",
+    userLoading,
+    " authenticated status :",
+    isAuthenticated
+  );
 
-  // If not onboarded, don't show anything (will redirect in useEffect)
-  if (
-    isOnboarded === false ||
-    isOnboarded === undefined ||
-    isOnboarded === null
-  ) {
-    return null;
-  }
+  if (!user) return null;
 
-  // User is authenticated and onboarded, show the dashboard
   return (
-    <AuthRequiredRoute>
-      <SocketProvider>{children}</SocketProvider>
-    </AuthRequiredRoute>
+    <SocketProvider>
+      <CallProvider>{children}</CallProvider>
+    </SocketProvider>
   );
 };

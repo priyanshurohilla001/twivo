@@ -3,7 +3,6 @@ import { Routes, Route } from "react-router-dom";
 import DashboardLayout from "../components/DashboardLayout.jsx";
 import DashboardHome from "./DashboardHome.jsx";
 
-
 // Appointments component
 const Appointments = () => {
   return (

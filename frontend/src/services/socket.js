@@ -15,7 +15,6 @@ export const initializeSocket = (username) => {
   }
 
   const serverUrl = import.meta.env.VITE_SERVER_URL;
-  console.log(`Connecting to socket server at: ${serverUrl}`);
 
   try {
     // Create new instance with manual connection

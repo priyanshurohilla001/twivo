@@ -28,6 +28,7 @@ export default async function basicUserInfo(req, res, next) {
       return plainFriend;
     });
     req.user = userObj;
+    req.currentUser = response;
   } catch (error) {
     console.log("error occured in basicUserInfo middleware", error);
     return res.status(500).json({
