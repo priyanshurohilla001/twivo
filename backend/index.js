@@ -135,6 +135,12 @@ const checkJwt = auth({
   tokenSigningAlg: "RS256",
 });
 
+app.get("/", (req, res) => {
+  res.status(200).json({
+    message: "Welcome to the backend API",
+  });
+});
+
 app.post("/api/user/onboarding", checkJwt, userOnboarding);
 
 app.use("/api/user", checkJwt, basicUserInfo, userRouter);
