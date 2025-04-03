@@ -87,11 +87,12 @@ io.on("connection", (socket) => {
       io.to(socketId).emit("callAccepted", { from, answer });
     }
   });
-  socket.on("callRejected", (data) => {
+
+  socket.on("hangup", (data) => {
     const { to, from } = data;
     const socketId = connectedUsers.get(to);
     if (socketId) {
-      io.to(socketId).emit("callRejected", { from });
+      io.to(socketId).emit("hangup", { from });
     }
   });
 
@@ -102,7 +103,7 @@ io.on("connection", (socket) => {
       io.to(socketId).emit("iceCandidate", { from, candidate });
     }
   });
-  
+
   socket.on("disconnect", (reason) => {
     console.log(`User ${username} disconnected (${reason})`);
     connectedUsers.delete(username);
