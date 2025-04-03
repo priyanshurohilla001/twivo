@@ -20,41 +20,58 @@ export function CallProvider({ children }) {
   const pc = useRef(null);
   const offer = useRef(null);
   const iceCandidatesBuffer = useRef([]);
+  const callTimeout = useRef(null);
+
+  useEffect(() => {
+    window.addEventListener("beforeunload", endCall);
+    return () => window.removeEventListener("beforeunload", endCall);
+  }, []);
 
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("call", async (data) => {
+    iceCandidatesBuffer.current = [];
+
+    function handleOnCall(data) {
       const { from, offer: receivedOffer } = data;
 
-      setCall((prevState) => ({
-        ...prevState,
-        callStatus: "incoming",
-        recipient: from,
-      }));
-      offer.current = receivedOffer;
-    });
+      setCall((prevState) => {
+        if (prevState.callStatus !== "idle") return prevState;
+        offer.current = receivedOffer;
+        return {
+          ...prevState,
+          callStatus: "incoming",
+          recipient: from,
+        };
+      });
+    }
 
-    socket.on("callAccepted", async (data) => {
+    async function handleCallAccepted(data) {
       console.log("answer received", data.answer);
       const { answer, from } = data;
       if (pc.current) {
-        await pc.current.setRemoteDescription(answer);
-      }
-      setCall((prevState) => ({
-        ...prevState,
-        callStatus: "connected",
-        recipient: from,
-      }));
-    });
+        try {
+          await pc.current.setRemoteDescription(answer);
 
-    socket.on("hangup", () => {
+          setCall((prevState) => ({
+            ...prevState,
+            callStatus: "connected",
+            recipient: from,
+          }));
+        } catch (error) {
+          console.error("Failed to set remote description:", error);
+          endCall();
+        }
+      }
+    }
+
+    function handleHangup() {
       if (pc.current) {
         pc.current.close();
         pc.current = null;
       }
       setCall(initialState);
-    });
+    }
 
     const handleIceCandidate = async (data) => {
       const { candidate, from } = data;
@@ -64,17 +81,32 @@ export function CallProvider({ children }) {
         iceCandidatesBuffer.current.push(candidate);
         return;
       }
-
-      await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+      try {
+        await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (e) {
+        console.warn("Failed to add ICE candidate:", e);
+      }
     };
 
+    socket.on("call", handleOnCall);
+    socket.on("callAccepted", handleCallAccepted);
+    socket.on("hangup", handleHangup);
     socket.on("iceCandidate", handleIceCandidate);
 
     return () => {
-      socket.off("call");
-      socket.off("callAccepted");
+      socket.off("call", handleOnCall);
+      socket.off("callAccepted", handleCallAccepted);
+      socket.off("hangup", handleHangup);
       socket.off("iceCandidate", handleIceCandidate);
-      socket.off("hangup");
+
+      if (call.localStream) {
+        call.localStream.getTracks().forEach((track) => track.stop());
+      }
+
+      if (pc.current) {
+        pc.current.close();
+        pc.current = null;
+      }
     };
   }, [socket]);
 
@@ -83,19 +115,30 @@ export function CallProvider({ children }) {
 
     while (iceCandidatesBuffer.current.length > 0) {
       const candidate = iceCandidatesBuffer.current.shift();
-      await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+      try {
+        await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (e) {
+        console.warn("Failed to add ICE candidate:", e);
+      }
     }
   };
 
   async function endCall() {
     if (pc.current) {
+      pc.current.onicecandidate = null;
+      pc.current.ontrack = null;
       pc.current.close();
       pc.current = null;
     }
 
+    clearTimeout(callTimeout.current);
+    offer.current = null;
+
     if (call.localStream) {
       call.localStream.getTracks().forEach((track) => track.stop());
     }
+
+    iceCandidatesBuffer.current = [];
 
     setCall(initialState);
 
@@ -107,15 +150,7 @@ export function CallProvider({ children }) {
     }
   }
 
-  async function makeCall(username) {
-    if (!socket) {
-      throw new Error("Socket not initialized while making a call");
-    }
-
-    if (!username) {
-      throw new Error("Username is required to make a call");
-    }
-
+  const createPeerConnection = (recipient) => {
     const peerConnection = new RTCPeerConnection({
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
@@ -125,50 +160,69 @@ export function CallProvider({ children }) {
       iceCandidatePoolSize: 10,
     });
 
-    pc.current = peerConnection;
-
-    peerConnection.onconnectionstatechange = () => {
-      console.log(
-        `Connection state changed: ${peerConnection.connectionState}`
-      );
-    };
-
-    peerConnection.oniceconnectionstatechange = () => {
-      console.log(`ICE connection state: ${peerConnection.iceConnectionState}`);
-    };
-
-    peerConnection.onsignalingstatechange = () => {
-      console.log(`Signaling state: ${peerConnection.signalingState}`);
-    };
-
-    peerConnection.ontrack = (event) => {
-      console.log("Remote track received", event.streams[0]);
-      setCall((prev) => ({ ...prev, remoteStream: event.streams[0] }));
-    };
-
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
         socket.emit("iceCandidate", {
           candidate: event.candidate,
-          to: username,
+          to: recipient,
           from: user.username,
         });
       }
     };
 
-    // get local stream
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true,
-    });
+    peerConnection.onconnectionstatechange = () => {
+      console.log(
+        `Connection state changed: ${peerConnection.connectionState}`,
+      );
+      if (
+        peerConnection.connectionState === "failed" ||
+        peerConnection.connectionState === "disconnected"
+      ) {
+        console.error("Connection failed or disconnected");
+        endCall();
+      }
+    };
 
-    if (!stream) {
-      throw new Error("Failed to get local stream");
+    peerConnection.ontrack = (event) => {
+      const newStream = new MediaStream();
+      event.streams[0]
+        .getTracks()
+        .forEach((track) => newStream.addTrack(track));
+      setCall((prev) => ({ ...prev, remoteStream: newStream }));
+    };
+
+    return peerConnection;
+  };
+
+  async function makeCall(username) {
+    if (!socket) {
+      throw new Error("Socket not initialized while making a call");
     }
 
-    stream.getTracks().forEach((track) => {
-      peerConnection.addTrack(track, stream);
-    });
+    if (!username) {
+      throw new Error("Username is required to make a call");
+    }
+
+    const peerConnection = createPeerConnection(username);
+
+    pc.current = peerConnection;
+
+    let stream;
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+
+      stream.getTracks().forEach((track) => {
+        peerConnection.addTrack(track, stream);
+      });
+    } catch (error) {
+      console.log("error while getting media access :", error);
+      endCall();
+      return;
+    }
 
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
@@ -185,6 +239,10 @@ export function CallProvider({ children }) {
       recipient: username,
       localStream: stream,
     }));
+
+    callTimeout.current = setTimeout(() => {
+      if (call.callStatus === "outgoing") endCall();
+    }, 30000);
   }
 
   async function acceptCall() {
@@ -198,55 +256,37 @@ export function CallProvider({ children }) {
       throw new Error("Socket not initialized while accepting a call");
     }
 
-    console.log("offer in accept call:", offer.current);
-
     if (!offer.current) {
       throw new Error("Offer is required to accept a call");
     }
 
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        {
-          urls: "stun:stun.l.google.com:19302",
-        },
-      ],
-    });
+    // In acceptCall function, add more STUN servers like you have in makeCall:
+    const peerConnection = createPeerConnection(call.recipient);
 
-    pc.current = pc;
+    pc.current = peerConnection;
 
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.emit("iceCandidate", {
-          candidate: event.candidate,
-          to: call.recipient,
-          from: user.username,
-        });
-      }
-    };
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
 
-    pc.ontrack = (event) => {
-      setCall((prev) => ({ ...prev, remoteStream: event.streams[0] }));
-    };
+      stream.getTracks().forEach((track) => {
+        peerConnection.addTrack(track, stream);
+      });
+    } catch (error) {
+      console.log("error while getting media access :", error);
+      endCall();
+      return;
+    }
+
+    await peerConnection.setRemoteDescription(offer.current);
 
     await applyBufferedCandidates();
 
-    // get local stream
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true,
-    });
-
-    if (!stream) {
-      throw new Error("Failed to get local stream");
-    }
-
-    stream.getTracks().forEach((track) => {
-      pc.addTrack(track, stream);
-    });
-
-    await pc.setRemoteDescription(offer.current);
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
 
     socket.emit("callAccepted", {
       from: user.username,
@@ -280,7 +320,7 @@ export function CallProvider({ children }) {
 export const useCall = () => {
   const context = useContext(CallContext);
   if (context === undefined) {
-    throw new Error("useUser must be used within a UserProvider");
+    throw new Error("useCall must be used within a CallProvider");
   }
   return context;
 };

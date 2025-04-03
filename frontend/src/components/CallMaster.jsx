@@ -1,14 +1,21 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "./ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "./ui/card";
 import { useCall } from "@/hooks/useCall";
+import { Mic, MicOff, Video, VideoOff } from "lucide-react";
 
 const CallMaster = () => {
   const { call, acceptCall, endCall } = useCall();
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
-
-  console.log("call in CallMaster:", call);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
 
   useEffect(() => {
     if (localVideoRef.current) {
@@ -21,6 +28,26 @@ const CallMaster = () => {
       remoteVideoRef.current.srcObject = call.remoteStream;
     }
   }, [call.remoteStream]);
+
+  const toggleMute = () => {
+    if (call.localStream) {
+      const audioTracks = call.localStream.getAudioTracks();
+      audioTracks.forEach((track) => {
+        track.enabled = !track.enabled;
+      });
+      setIsMuted(!isMuted);
+    }
+  };
+
+  const toggleVideo = () => {
+    if (call.localStream) {
+      const videoTracks = call.localStream.getVideoTracks();
+      videoTracks.forEach((track) => {
+        track.enabled = !track.enabled;
+      });
+      setIsVideoOff(!isVideoOff);
+    }
+  };
 
   if (call.callStatus === "idle") {
     return (
@@ -53,11 +80,7 @@ const CallMaster = () => {
               </div>
             </CardContent>
             <CardFooter className="flex justify-center p-4">
-              <Button
-                variant="destructive"
-                onClick={endCall}
-                className="px-6"
-              >
+              <Button variant="destructive" onClick={endCall} className="px-6">
                 Cancel Call
               </Button>
             </CardFooter>
@@ -81,10 +104,7 @@ const CallMaster = () => {
             >
               Accept
             </Button>
-            <Button
-              variant="destructive"
-              onClick={endCall}
-            >
+            <Button variant="destructive" onClick={endCall}>
               Reject
             </Button>
           </CardFooter>
@@ -99,46 +119,75 @@ const CallMaster = () => {
           </h1>
           <div className="grid grid-cols-1 gap-4 relative">
             {/* Remote video card */}
-            <Card className="w-full overflow-hidden bg-slate-800 border-2 border-slate-700">
+            <Card className="w-full overflow-hidden bg-slate-800 border-2 border-slate-700 shadow-xl">
               <CardHeader className="bg-slate-900 py-2">
-                <CardTitle className="text-lg text-white">
-                  {call.recipient}'s Camera
+                <CardTitle className="text-lg text-white flex justify-between items-center">
+                  <span>{call.recipient}'s Camera</span>
+                  <div className="text-sm font-normal text-slate-300">
+                    Connected
+                  </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-0 aspect-video">
+              <CardContent className="p-0 aspect-video relative">
                 <video
                   ref={remoteVideoRef}
                   autoPlay
                   playsInline
                   className="w-full h-full object-cover"
                 />
+                {!call.remoteStream && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-700">
+                    <p className="text-white text-lg">Connecting video...</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
-            
+
             {/* Local video card - positioned overlay */}
-            <Card className="absolute bottom-4 right-4 w-1/4 overflow-hidden border-2 border-white shadow-lg">
-              <CardHeader className="bg-primary py-1">
-                <CardTitle className="text-sm text-white text-center">
-                  Your Camera
-                </CardTitle>
-              </CardHeader>
+            <Card className="absolute bottom-4 right-4 w-1/4 overflow-hidden border-2 border-primary/50 shadow-lg transition-all duration-200 hover:scale-105">
               <CardContent className="p-0 aspect-video">
                 <video
                   ref={localVideoRef}
                   autoPlay
                   playsInline
                   muted
-                  className="w-full h-full object-cover"
+                  className={`w-full h-full object-cover ${isVideoOff ? "opacity-0" : ""}`}
                 />
+                {isVideoOff && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
+                    <p className="text-white text-xs">Video off</p>
+                  </div>
+                )}
+                <div className="absolute bottom-2 left-2 bg-primary/80 text-white px-2 py-1 rounded-sm text-xs">
+                  You
+                </div>
               </CardContent>
             </Card>
           </div>
-          
-          <div className="flex justify-center mt-4">
+
+          <div className="flex justify-center mt-6 gap-4">
+            <Button
+              variant="outline"
+              onClick={toggleMute}
+              className="rounded-full w-12 h-12 p-0 flex items-center justify-center"
+              title={isMuted ? "Unmute" : "Mute"}
+            >
+              {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={toggleVideo}
+              className="rounded-full w-12 h-12 p-0 flex items-center justify-center"
+              title={isVideoOff ? "Turn on camera" : "Turn off camera"}
+            >
+              {isVideoOff ? <VideoOff size={18} /> : <Video size={18} />}
+            </Button>
+
             <Button
               variant="destructive"
               onClick={endCall}
-              className="px-8 py-6 text-lg"
+              className="px-8 py-2 rounded-full"
             >
               End Call
             </Button>
